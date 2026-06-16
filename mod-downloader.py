@@ -1,12 +1,17 @@
 import requests
+import argparse
 
-search_query = "sodium"
-search_loader= "fabric"
-search_version = "1.21.1"
-search_limit = 5
-latest = False
+arg_parser = argparse.ArgumentParser()
 
-search_response = requests.get(f'https://api.modrinth.com/v2/search?query={search_query}&facets=[["project_type:mod"],["categories:{search_loader}"],["versions:{search_version}"]]&limit={search_limit}')
+arg_parser.add_argument('-n','--name',help='Name of the mod', required=True)
+arg_parser.add_argument('-m','--modloader',help='Modloader of the mod', required=True)
+arg_parser.add_argument('-v','--version',help='Minecraft version of the mod', required=True)
+arg_parser.add_argument('-s','--search',help='Number of the results returned by the search',type=int, default=5)
+arg_parser.add_argument('-l','--latest',help='Autoselect latest release', action='store_true')
+
+args = arg_parser.parse_args()
+
+search_response = requests.get(f'https://api.modrinth.com/v2/search?query={args.name}&facets=[["project_type:mod"],["categories:{args.modloader}"],["versions:{args.version}"]]&limit={args.search}')
 print(f'Status code: {search_response.status_code}')
 
 search_json = search_response.json()
@@ -22,13 +27,14 @@ if search_json["total_hits"]:
     print(f'Selected mod: {search_json["hits"][mod_select]["title"]}')
     mod_id = search_json["hits"][mod_select]["project_id"]
     
-    version_response = requests.get(f'https://api.modrinth.com/v2/project/{mod_id}/version?loaders=["{search_loader}"]&game_versions=["{search_version}"]')
+    version_response = requests.get(f'https://api.modrinth.com/v2/project/{mod_id}/version?loaders=["{args.modloader}"]&game_versions=["{args.version}"]')
     print(f'Status code: {version_response.status_code}')
 
     version_json = version_response.json()
 
     if len(version_json): 
-        if latest:
+        if args.latest:
+            print("Selecting latest release")
             release_select = 0;
 
         else:
