@@ -1,61 +1,40 @@
-import requests
-import argparse
+import urllib.request
+import urllib.parse
+import json
 
-arg_parser = argparse.ArgumentParser()
+def api_request(path, **query_params):
+    base_url = f'https://api.modrinth.com/v2/{path}'
 
-arg_parser.add_argument('-n','--name',help='Name of the mod', required=True)
-arg_parser.add_argument('-m','--modloader',help='Modloader of the mod', required=True)
-arg_parser.add_argument('-v','--version',help='Minecraft version of the mod', required=True)
-arg_parser.add_argument('-s','--search',help='Number of the results returned by the search',type=int, default=5)
-arg_parser.add_argument('-l','--latest',help='Autoselect latest release', action='store_true')
+    query_string = urllib.parse.urlencode(query_params)
 
-args = arg_parser.parse_args()
+    url = f'{base_url}?{query_string}'
 
-search_response = requests.get(f'https://api.modrinth.com/v2/search?query={args.name}&facets=[["project_type:mod"],["categories:{args.modloader}"],["versions:{args.version}"]]&limit={args.search}')
-print(f'Status code: {search_response.status_code}')
+    headers = {'User-Agent': 'salihnayc/mod-downloader'}
+    req = urllib.request.Request(url, headers=headers)
 
-search_json = search_response.json()
+    with urllib.request.urlopen(req) as response:
+        data_raw = response.read().decode('utf-8')
+        data_json = json.loads(data_raw)
 
-if search_json["total_hits"]:
-    print("Search results: ")
-    n=1
-    for hit in search_json["hits"]:
-        print(f'{n} - {hit["title"]} - {hit["description"]}')
-        n = n + 1
+    return data_json
 
-    mod_select = int(input('Select a mod (eg "2"): ')) - 1 # Array indexes start at 0
-    print(f'Selected mod: {search_json["hits"][mod_select]["title"]}')
-    mod_id = search_json["hits"][mod_select]["project_id"]
-    
-    version_response = requests.get(f'https://api.modrinth.com/v2/project/{mod_id}/version?loaders=["{args.modloader}"]&game_versions=["{args.version}"]')
-    print(f'Status code: {version_response.status_code}')
-
-    version_json = version_response.json()
-
-    if len(version_json): 
-        if args.latest:
-            print("Selecting latest release")
-            release_select = 0;
-
-        else:
-            n = 1
-            for version in version_json:
-                print(f'{n} - {version["name"]}')
-                n = n + 1
-
-            release_select = int(input('Select a release (eg "2"): ')) - 1
+def make_selection(array, question, *values):
+    n = 1
+    for i in array:
+        print(n, end='')
+        for j in values:
+            print(f' - {i[j]}', end='')
+        print()
+        n += 1
         
-        file_url = version_json[release_select]["files"][0]["url"]
-        file_name = version_json[release_select]["files"][0]["filename"]
-        print(f'Downloading file: {file_name}')
+    x = int(input(question))
+    return x - 1
 
-        file_response = requests.get(file_url)
+def search_mods(mod_name, modloader, minecraft_version, search_limit):
+    facet = f'[["project_type=mod"],["categories:{modloader}"],["versions:{minecraft_version}"]]'
+    search_json = api_request('search', query=mod_name, facets=facet, limit=search_limit)
 
-        with open(file_name, "wb") as file:
-            file.write(file_response.content)
+    x = make_selection(search_json['hits'], 'Select a mod e.g. 2: ', 'title', 'description')
+    print(f'Selected mod: {search_json['hits'][x]['title']}')
 
-    else:
-        print("0 releases returned")
-
-else:
-    print("0 mods returned")
+search_mods('sodium', 'fabric', '26.1.2', 5)
